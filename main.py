@@ -2,11 +2,14 @@
 from flask import Flask, request
 import mysql.connector
 from config import DB_PASSWORD
+from flask import jsonify
 
 app = Flask(__name__)
 
-def save_to_db(category, sub_category, value):
-    conn = mysql.connector.connect(
+
+
+def soql_connect():
+    return mysql.connector.connect(
         host="mysql.mikr.us",
         user="yasmin464",
         password=DB_PASSWORD,
@@ -14,6 +17,9 @@ def save_to_db(category, sub_category, value):
         port=3306
     )
 
+
+def save_to_db_activitie(category, sub_category, value):
+    conn = soql_connect()
     cursor = conn.cursor()
 
     query = """
@@ -28,10 +34,72 @@ def save_to_db(category, sub_category, value):
     conn.close()
 
 
-@app.route("/test", methods=["POST"])
-def test():
+
+def save_to_db_wellbeing(mood, motivation, mindfulness, libido):
+    conn = soql_connect()
+    cursor = conn.cursor()
+
+    query = """
+    INSERT INTO wellbeing_metrics (mood, motivation, mindfulness, libido)
+    VALUES (%s, %s, %s, %s)
+    """
+
+    cursor.execute(query, (mood, motivation, mindfulness, libido))
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+
+@app.route("/activitie", methods=["POST"])
+def post_activitie():
 
     print("==== REQUEST ====")
+
+    data = request.get_json(silent=True)
+
+    if data is None:
+        data = request.form.to_dict()
+
+    print("DATA:", data)
+
+    category = data.get("category")
+    sub_category = data.get("subCategory") 
+    value = data.get("value")
+
+    try:
+        value = int(value) 
+    except:
+        return "Invalid value", 400
+
+    save_to_db_activitie(category, sub_category, value)
+
+    return {"status": "ok"}, 200
+
+
+@app.route("/wellbeing", methods=["GET"])
+def get_latest_wellbeing():
+
+    conn = soql_connect()
+    cursor = conn.cursor(dictionary=True)
+
+    query = """
+    SELECT *
+    FROM wellbeing_metrics
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+
+    cursor.execute(query)
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return {"data": result}, 200
+
+@app.route("/wellbeing", methods=["POST"])
+def post_wellbeing():
 
     data = request.get_json(silent=True)
 
@@ -41,18 +109,12 @@ def test():
 
     print("DATA:", data)
 
-    # ✅ pobieramy dane z requesta
-    category = data.get("category")
-    sub_category = data.get("subCategory")  # uwaga: Garmin camelCase!
-    value = data.get("value")
+    mood = data.get("mood")
+    motivation = data.get("motivation")  # uwaga: Garmin camelCase!
+    mindfulness = data.get("mindfulness")
+    libido = data.get("libido")
 
-    try:
-        value = int(value)  # konwersja do int
-    except:
-        return "Invalid value", 400
-
-    # ✅ zapis do bazy
-    save_to_db(category, sub_category, value)
+    save_to_db_wellbeing(mood, motivation, mindfulness, libido)
 
     return {"status": "ok"}, 200
 
