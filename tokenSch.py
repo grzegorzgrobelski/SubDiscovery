@@ -4,10 +4,11 @@ import urllib.parse
 from datetime import datetime, timedelta
 import time
 import os
+from config import FITATU_EMAIL, FITATU_PASSWORD
 
 
-email = "email"
-password = "haslo"
+email = FITATU_EMAIL
+password = FITATU_PASSWORD
 
 
 def get_expiry_datetime(expires_str):
