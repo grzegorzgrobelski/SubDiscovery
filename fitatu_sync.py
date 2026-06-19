@@ -6,16 +6,18 @@ from fitatu_helper import FitatuHelper
 class FitatuSync:
 
     @staticmethod
-    def _macros_changed(new, old):
+    def macros_changed(new, old, epsilon=0.01):
         if not old:
             return True
 
         fields = ["energy", "protein", "fat", "carbohydrate", "fiber", "sugars", "salt"]
 
         for f in fields:
-            if float(new.get(f, 0)) != float(old.get(f, 0)):
-                return True
+            new_val = float(new.get(f, 0))
+            old_val = float(old.get(f, 0))
 
+            if abs(new_val - old_val) > epsilon:
+                return True
         return False
 
     @staticmethod
