@@ -1,123 +1,79 @@
-
-from flask import Flask, request
-import mysql.connector
-from config import DB_PASSWORD
-from flask import jsonify
+from flask import Flask, request, jsonify
+from db_service import DbService
+from fitatu_helper import FitatuHelper
 
 app = Flask(__name__)
 
 
-
-def soql_connect():
-    return mysql.connector.connect(
-        host="mysql.mikr.us",
-        user="yasmin464",
-        password=DB_PASSWORD,
-        database="db_yasmin464",
-        port=3306
-    )
-
-
-def save_to_db_activitie(category, sub_category, value):
-    conn = soql_connect()
-    cursor = conn.cursor()
-
-    query = """
-    INSERT INTO activities (category, sub_category, value)
-    VALUES (%s, %s, %s)
-    """
-
-    cursor.execute(query, (category, sub_category, value))
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-
-
-def save_to_db_wellbeing(mood, motivation, mindfulness, libido):
-    conn = soql_connect()
-    cursor = conn.cursor()
-
-    query = """
-    INSERT INTO wellbeing_metrics (mood, motivation, mindfulness, libido)
-    VALUES (%s, %s, %s, %s)
-    """
-
-    cursor.execute(query, (mood, motivation, mindfulness, libido))
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-
+# -----------------------------
+# ACTIVITIES
+# -----------------------------
 @app.route("/activitie", methods=["POST"])
 def post_activitie():
 
     print("==== REQUEST ====")
 
-    data = request.get_json(silent=True)
-
-    if data is None:
-        data = request.form.to_dict()
+    data = request.get_json(silent=True) or request.form.to_dict()
 
     print("DATA:", data)
 
     category = data.get("category")
-    sub_category = data.get("subCategory") 
+    sub_category = data.get("subCategory")
     value = data.get("value")
 
     try:
-        value = int(value) 
+        value = int(value)
     except:
-        return "Invalid value", 400
+        return {"error": "Invalid value"}, 400
 
-    save_to_db_activitie(category, sub_category, value)
+    DbService.add_activity(category, sub_category, value)
 
     return {"status": "ok"}, 200
 
-
+# -----------------------------
+# WELLBEING
+# -----------------------------
 @app.route("/wellbeing", methods=["GET"])
 def get_latest_wellbeing():
 
-    conn = soql_connect()
-    cursor = conn.cursor(dictionary=True)
-
-    query = """
-    SELECT *
-    FROM wellbeing_metrics
-    ORDER BY created_at DESC
-    LIMIT 1
-    """
-
-    cursor.execute(query)
-    result = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
+    result = DbService.get_latest_wellbeing()
 
     return {"data": result}, 200
+
 
 @app.route("/wellbeing", methods=["POST"])
 def post_wellbeing():
 
-    data = request.get_json(silent=True)
-
-    # Garmin wysyła form-encoded
-    if data is None:
-        data = request.form.to_dict()
+    data = request.get_json(silent=True) or request.form.to_dict()
 
     print("DATA:", data)
 
     mood = data.get("mood")
-    motivation = data.get("motivation")  # uwaga: Garmin camelCase!
+    motivation = data.get("motivation")
     mindfulness = data.get("mindfulness")
     libido = data.get("libido")
 
-    save_to_db_wellbeing(mood, motivation, mindfulness, libido)
+    DbService.add_wellbeing(mood, motivation, mindfulness, libido)
 
     return {"status": "ok"}, 200
 
 
+# -----------------------------
+# DAILY MACROS
+# -----------------------------
+@app.route("/daily_macros", methods=["GET"])
+def get_daily_macros():
+    try:
+        macros = FitatuHelper.get_today_macros()
+        return {"data": macros}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+
+
+# -----------------------------
+# START APP
+# -----------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)

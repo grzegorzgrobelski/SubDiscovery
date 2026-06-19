@@ -4,6 +4,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 import time
 import os
+from fitatu_sync import FitatuSync
 from config import FITATU_EMAIL, FITATU_PASSWORD
 
 
@@ -36,8 +37,6 @@ def load_session_data(filename="session_data.json"):
     except:
         return None
 
-
-
 def save_session_data(session_data, filename="session_data.json", retries=5, delay=10):
     """
     Zapis pliku z retry jeśli plik jest używany
@@ -65,12 +64,20 @@ def save_session_data(session_data, filename="session_data.json", retries=5, del
                 return False
 
 
-
 def login_and_save():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=[ 
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ]
+        )
+
         context = browser.new_context()
         page = context.new_page()
+
 
         page.goto("https://www.fitatu.com/app/login", timeout=60000)
 
@@ -82,6 +89,8 @@ def login_and_save():
         # login
         page.fill("input[type=email]", email)
         page.fill("input[type=password]", password)
+
+        
 
         page.evaluate("""
             document.querySelector("button.page-login__submit-button")?.click();
@@ -107,10 +116,18 @@ def login_and_save():
 
         if session_data:
             save_session_data(session_data)
-
+        
         browser.close()
 
+        if session_data:
+            try:
+                FitatuSync.sync_today()
+            except Exception as e:
+                print(e)
+                pass
+
     return session_data
+
 
 def run_scheduler():
     while True:
@@ -149,7 +166,6 @@ def run_scheduler():
             print("❌ Error:", e)
             print("Retry in 60s...")
             time.sleep(60)
-
 
 if __name__ == "__main__":
     run_scheduler()
