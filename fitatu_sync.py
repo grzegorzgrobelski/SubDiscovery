@@ -6,7 +6,7 @@ from fitatu_helper import FitatuHelper
 class FitatuSync:
 
     @staticmethod
-    def macros_changed(new, old, epsilon=0.01):
+    def _macros_changed(new, old, epsilon=0.01):
         if not old:
             return True
 
